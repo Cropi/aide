@@ -149,6 +149,7 @@ int init_md(struct md_container*);
 int update_md(struct md_container*,void*,ssize_t);
 int close_md(struct md_container*);
 void md2line(struct md_container*,struct db_line*);
+DB_ATTR_TYPE get_available_crypto();
 
 
 #endif /*_MD_H_INCLUDED*/

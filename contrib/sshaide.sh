@@ -260,7 +260,7 @@ gen_rand_word () {
     _randword=`grep -n . ${_wordlist} | grep "^${_linenum}:" | cut -d: -f2`
  
     # If $_randword has anything other than lower-case chars, try again
-    (echo ${_randword} | LC_ALL=C grep '[^a-z]' 2>&1 >> /dev/null \
+    ({ echo ${_randword} | LC_ALL=C grep '[^a-z]' 2>&1; } >> /dev/null \
             && gen_rand_word ) || \
  
     # Return the word

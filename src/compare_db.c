@@ -110,7 +110,7 @@ const DB_ATTR_TYPE details_attributes[] = { DB_FTYPE, DB_LINKNAME, DB_SIZE, DB_S
 #endif
 };
 
-const char* details_string[] = { _("File type") , _("Lname"), _("Size"), _("Size (>)"), _("Bcount"), _("Perm"), _("Uid"), _("Gid"), _("Atime"), _("Mtime"), _("Ctime"), _("Inode"), _("Linkcount"), _("MD5"), _("SHA1"), _("RMD160"), _("TIGER"), _("SHA256"), _("SHA512")
+const char* details_string[] = { _("File type") , _("Lname"), _("Size"), _("Size"), _("Bcount"), _("Perm"), _("Uid"), _("Gid"), _("Atime"), _("Mtime"), _("Ctime"), _("Inode"), _("Linkcount"), _("MD5"), _("SHA1"), _("RMD160"), _("TIGER"), _("SHA256"), _("SHA512")
 #ifdef WITH_MHASH
     , _("CRC32"), _("HAVAL"), _("GOST"), _("CRC32B"), _("WHIRLPOOL")
 #endif
@@ -269,12 +269,19 @@ static int xattrs2array(xattrs_type* xattrs, char* **values) {
             if ((len ==  xattrs->ents[num - 1].vsz) || ((len == (xattrs->ents[num - 1].vsz - 1)) && !val[len])) {
                 length = 8 + width + strlen(xattrs->ents[num - 1].key) + strlen(val);
                 (*values)[num]=malloc(length *sizeof(char));
-                snprintf((*values)[num], length , "[%.*zd] %s = %s", width, num, xattrs->ents[num - 1].key, val);
+
+                char * fmt = "[%.*zd] %s = %s";
+                if (conf->syslog_format) fmt = "[%.*zd]%s=%s"; // its smaller so it has to be enough space allocated.
+                snprintf((*values)[num], length , fmt, width, num, xattrs->ents[num - 1].key, val);
+
             } else {
                 val = encode_base64(xattrs->ents[num - 1].val, xattrs->ents[num - 1].vsz);
                 length = 10 + width + strlen(xattrs->ents[num - 1].key) + strlen(val);
                 (*values)[num]=malloc( length  *sizeof(char));
-                snprintf((*values)[num], length , "[%.*zd] %s <=> %s", width, num, xattrs->ents[num - 1].key, val);
+
+                char * fmt = "[%.*zd] %s <=> %s";
+                if (conf->syslog_format) fmt = "[%.*zd]%s<=>%s"; // its smaller so it has to be enough space allocated.
+                snprintf((*values)[num], length , fmt, width, num, xattrs->ents[num - 1].key, val);
                 free(val);
             }
         }
@@ -302,6 +309,26 @@ static int acl2array(acl_type* acl, char* **values) {
         }
     if (acl->acl_a || acl->acl_d) {
         int j, k, i;
+        if (conf->syslog_format) {
+            *values = malloc(2 * sizeof(char*));
+
+            char *A= "<NONE>", *D = "<NONE>";
+
+            if (acl->acl_a) { A = acl->acl_a; } 
+            if (acl->acl_d) { D = acl->acl_d; } 
+
+            (*values)[0] = (char*) malloc(strlen(A) + 3); // "A:" and \0
+            snprintf((*values)[0], strlen(A) + 3, "A:%s", A);
+
+            (*values)[1] = (char*) malloc(strlen(D) + 3); // "D:" and \0
+            snprintf((*values)[1], strlen(D) + 3, "D:%s", D);
+
+            i = 0; while ( (*values)[0][i] ) { if ( (*values)[0][i]=='\n') { (*values)[0][i] = ' '; } i++; }
+            i = 0; while ( (*values)[1][i] ) { if ( (*values)[1][i]=='\n') { (*values)[1][i] = ' '; } i++; }
+
+            return 2;
+        }
+
         if (acl->acl_a) { i = 0; while (acl->acl_a[i]) { if (acl->acl_a[i++]=='\n') { n++; } } }
         if (acl->acl_d) { i = 0; while (acl->acl_d[i]) { if (acl->acl_d[i++]=='\n') { n++; } } }
         *values = malloc(n * sizeof(char*));
@@ -338,25 +365,25 @@ static char* e2fsattrs2string(unsigned long flags, int flags_only) {
 
 static char* get_file_type_string(mode_t mode) {
     switch (mode & S_IFMT) {
-        case S_IFREG: return _("File");
-        case S_IFDIR: return _("Directory");
+        case S_IFREG: return conf->syslog_format ? "file" : _("File");
+        case S_IFDIR: return conf->syslog_format ? "dir" : _("Directory");
 #ifdef S_IFIFO
-        case S_IFIFO: return _("FIFO");
+        case S_IFIFO: return conf->syslog_format ? "fifo" : _("FIFO");
 #endif
-        case S_IFLNK: return _("Link");
-        case S_IFBLK: return _("Block device");
-        case S_IFCHR: return _("Character device");
+        case S_IFLNK: return conf->syslog_format ? "link" : _("Link");
+        case S_IFBLK: return conf->syslog_format ? "blockd" : _("Block device");
+        case S_IFCHR: return conf->syslog_format ? "chard" : _("Character device");
 #ifdef S_IFSOCK
-        case S_IFSOCK: return _("Socket");
+        case S_IFSOCK: return conf->syslog_format ? "socket" : _("Socket");
 #endif
 #ifdef S_IFDOOR
-        case S_IFDOOR: return _("Door");
+        case S_IFDOOR: return conf->syslog_format ? "door" : _("Door");
 #endif
 #ifdef S_IFPORT
-        case S_IFPORT: return _("Port");
+        case S_IFPORT: return conf->syslog_format ? "port" : _("Port");
 #endif
         case 0: return NULL;
-        default: return _("Unknown file type");
+        default: return conf->syslog_format ? "unknown" : _("Unknown file type");
     }
 }
 
@@ -554,12 +581,77 @@ static void print_dbline_attributes(db_line* oline, db_line* nline, DB_ATTR_TYPE
     }
 }
 
+
+static void print_dbline_attributes_syslog(db_line* oline, db_line* nline, DB_ATTR_TYPE
+        changed_attrs, DB_ATTR_TYPE force_attrs) {
+    char **ovalue, **nvalue;
+    int onumber, nnumber, i, j;
+    int length = sizeof(details_attributes)/sizeof(DB_ATTR_TYPE);
+    DB_ATTR_TYPE attrs;
+    char *file_type = get_file_type_string((nline==NULL?oline:nline)->perm);
+    if (file_type) {
+        error(0,"%s=", file_type);
+    }
+    error(0,"%s", (nline==NULL?oline:nline)->filename);
+    attrs=force_attrs|(~(ignored_changed_attrs)&changed_attrs);
+    for (j=0; j < length; ++j) {
+        if (details_attributes[j]&attrs) {
+            onumber=get_attribute_values(details_attributes[j], oline, &ovalue);
+            nnumber=get_attribute_values(details_attributes[j], nline, &nvalue);
+
+            if (details_attributes[j] == DB_ACL || details_attributes[j] == DB_XATTRS) {
+
+                error(0, ";%s_old=|", details_string[j]);
+
+                for (i = 0 ; i < onumber ; i++) {
+                    error(0, "%s|", ovalue[i]);
+                }
+
+                error(0, ";%s_new=|", details_string[j]);
+
+                for (i = 0 ; i < nnumber ; i++) {
+                    error(0, "%s|", nvalue[i]);
+                }
+
+            } else {
+
+                error(0, ";%s_old=%s;%s_new=%s", details_string[j], *ovalue, details_string[j], *nvalue);
+
+            }
+
+            for(i=0; i < onumber; ++i) { free(ovalue[i]); ovalue[i]=NULL; } free(ovalue); ovalue=NULL;
+            for(i=0; i < nnumber; ++i) { free(nvalue[i]); nvalue[i]=NULL; } free(nvalue); nvalue=NULL;
+        }
+    }
+    error(0, "\n");
+}
+
 static void print_attributes_added_node(db_line* line) {
     print_dbline_attributes(NULL, line, 0, line->attr);
 }
 
 static void print_attributes_removed_node(db_line* line) {
     print_dbline_attributes(line, NULL, 0, line->attr);
+}
+
+static void print_attributes_added_node_syslog(db_line* line) {
+
+    char *file_type = get_file_type_string(line->perm);
+    if (file_type) {
+        error(0,"%s=", file_type);
+    }
+    error(0,"%s; added\n", line->filename);
+
+}
+
+static void print_attributes_removed_node_syslog(db_line* line) {
+
+    char *file_type = get_file_type_string(line->perm);
+    if (file_type) {
+        error(0,"%s=", file_type);
+    }
+    error(0,"%s; removed\n", line->filename);
+
 }
 
 static void terse_report(seltree* node) {
@@ -623,6 +715,26 @@ static void print_report_details(seltree* node) {
     }
     for(r=node->childs;r;r=r->next){
         print_report_details((seltree*)r->data);
+    }
+}
+
+static void print_syslog_format(seltree* node) {
+    list* r=NULL;
+
+    if (node->checked&NODE_CHANGED) {
+        print_dbline_attributes_syslog(node->old_data, node->new_data, node->changed_attrs, forced_attrs);
+    }
+   
+    if (node->checked&NODE_ADDED) {
+        print_attributes_added_node_syslog(node->new_data);
+    }
+
+    if (node->checked&NODE_REMOVED) {
+        print_attributes_removed_node_syslog(node->old_data); 
+    }
+        
+    for(r=node->childs;r;r=r->next){
+        print_syslog_format((seltree*)r->data);
     }
 }
 
@@ -747,39 +859,53 @@ int gen_report(seltree* node) {
     send_audit_report();
 #endif
     if ((nadd|nrem|nchg) > 0 || conf->report_quiet == 0) {
-    print_report_header();
-    if(conf->action&(DO_COMPARE|DO_DIFF) || (conf->action&DO_INIT && conf->report_detailed_init) ) {
-    if (conf->grouped) {
-        if (nadd) {
-            error(2,(char*)report_top_format,_("Added entries"));
-            print_report_list(node, NODE_ADDED);
+
+        if (!conf->syslog_format) {
+            print_report_header();
         }
-        if (nrem) {
-            error(2,(char*)report_top_format,_("Removed entries"));
-            print_report_list(node, NODE_REMOVED);
+
+        if(conf->action&(DO_COMPARE|DO_DIFF) || (conf->action&DO_INIT && conf->report_detailed_init) ) {
+            if (!conf->syslog_format && conf->grouped) {
+                if (nadd) {
+                    error(2,(char*)report_top_format,_("Added entries"));
+                    print_report_list(node, NODE_ADDED);
+                }
+                if (nrem) {
+                    error(2,(char*)report_top_format,_("Removed entries"));
+                    print_report_list(node, NODE_REMOVED);
+                }
+                if (nchg) {
+                    error(2,(char*)report_top_format,_("Changed entries"));
+                    print_report_list(node, NODE_CHANGED);
+                }
+            } else if (!conf->syslog_format && ( nadd || nrem || nchg ) ) {
+                if (nadd && nrem && nchg) { error(2,(char*)report_top_format,_("Added, removed and changed entries")); }
+                else if (nadd && nrem) { error(2,(char*)report_top_format,_("Added and removed entries")); }
+                else if (nadd && nchg) { error(2,(char*)report_top_format,_("Added and changed entries")); }
+                else if (nrem && nchg) { error(2,(char*)report_top_format,_("Removed and changed entries")); }
+                else if (nadd) { error(2,(char*)report_top_format,_("Added entries")); }
+                else if (nrem) { error(2,(char*)report_top_format,_("Removed entries")); }
+                else if (nchg) { error(2,(char*)report_top_format,_("Changed entries")); }
+                print_report_list(node, NODE_ADDED|NODE_REMOVED|NODE_CHANGED);
+            }
+            if (nadd || nrem || nchg) {
+                if (!conf->syslog_format) {
+                    error(nchg?5:7,(char*)report_top_format,_("Detailed information about changes"));
+                    print_report_details(node);
+                } else {
+                    /* Syslog Format */
+                    error(0, "AIDE found differences between database and filesystem!!\n");
+                    error(0, "summary;total_number_of_files=%ld;added_files=%ld;"
+                              "removed_files=%ld;changed_files=%ld\n",ntotal,nadd,nrem,nchg);
+                    print_syslog_format(node);
+                }
+            }
         }
-        if (nchg) {
-            error(2,(char*)report_top_format,_("Changed entries"));
-            print_report_list(node, NODE_CHANGED);
+        if (!conf->syslog_format) {
+            print_report_databases();
+            conf->end_time=time(&(conf->end_time));
+            print_report_footer();
         }
-    } else if (nadd || nrem || nchg) {
-        if (nadd && nrem && nchg) { error(2,(char*)report_top_format,_("Added, removed and changed entries")); }
-        else if (nadd && nrem) { error(2,(char*)report_top_format,_("Added and removed entries")); }
-        else if (nadd && nchg) { error(2,(char*)report_top_format,_("Added and changed entries")); }
-        else if (nrem && nchg) { error(2,(char*)report_top_format,_("Removed and changed entries")); }
-        else if (nadd) { error(2,(char*)report_top_format,_("Added entries")); }
-        else if (nrem) { error(2,(char*)report_top_format,_("Removed entries")); }
-        else if (nchg) { error(2,(char*)report_top_format,_("Changed entries")); }
-        print_report_list(node, NODE_ADDED|NODE_REMOVED|NODE_CHANGED);
-    }
-    if (nadd || nrem || nchg) {
-        error(nchg?5:7,(char*)report_top_format,_("Detailed information about changes"));
-        print_report_details(node);
-    }
-    }
-    print_report_databases();
-    conf->end_time=time(&(conf->end_time));
-    print_report_footer();
     }
 
     return conf->action&(DO_COMPARE|DO_DIFF) ? (nadd!=0)*1+(nrem!=0)*2+(nchg!=0)*4 : 0;

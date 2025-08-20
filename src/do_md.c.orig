@@ -101,13 +101,8 @@ int is_prelinked(int fd) {
                         continue;
 
                 while (!bingo && (data = elf_getdata (scn, data)) != NULL) {
-                        int maxndx;
+                        int maxndx = data->d_size / shdr.sh_entsize;
                         int ndx;
-			
-                        if (shdr.sh_entsize != 0)
-                                maxndx = data->d_size / shdr.sh_entsize;
-                        else
-                                continue;
 
                         for (ndx = 0; ndx < maxndx; ++ndx) {
                                 (void) gelf_getdyn (data, ndx, &dyn);

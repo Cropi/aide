@@ -702,24 +702,25 @@ if test x$with_zlib = xyes; then
   compoptionstring="${compoptionstring}WITH_ZLIB\\n"
 fi
 
+CURLLIB=
 if test x$with_curl = xyes; then
 	AC_PATH_PROG(curlconfig, "curl-config")
 	if test "_$curlconfig" != _ ; then
 		CURL_CFLAGS=`$curlconfig --cflags`
-		CURL_LIBS=`$curlconfig --libs`
+		CURLLIB=`$curlconfig --libs`
 	else
 		AC_MSG_ERROR([You don't have curl properly installed. Install it or try --without-curl.])
 	fi
   AC_CHECK_HEADERS(curl/curl.h,,
  	[AC_MSG_ERROR([You don't have curl properly installed. Install it or try --without-curl.])])
   CFLAGS="$CFLAGS $CURL_CFLAGS"
-  LDFLAGS="$LDFLAGS $CURL_LIBS"
   AC_CHECK_LIB(curl,curl_easy_init,havecurl=yes,
  	[AC_MSG_ERROR([You don't have curl properly installed. Install it or try --without-curl.])]
 )
   AC_DEFINE(WITH_CURL,1,[use curl])
 	compoptionstring="${compoptionstring}WITH_CURL\\n"
 fi
+AC_SUBST(CURLLIB)
 AM_CONDITIONAL(USE_CURL, test x$havecurl = xyes)
 
 AC_ARG_WITH(mhash,
@@ -783,11 +784,11 @@ AC_ARG_WITH([confighmactype],
 	[if test "x$withval" = "xmd5" ;then
 	   CONFIGHMACTYPE="MHASH_MD5"
 	else if test "x$withval" = "xsha1" ;then
-	      CONFIGHMACTYPE="MHASH_SHA1"
+	   CONFIGHMACTYPE="MHASH_SHA1"
 	else if test "x$withval" = "xsha256" ;then
-	      CONFIGHMACTYPE="MHASH_SHA256"
+	   CONFIGHMACTYPE="MHASH_SHA256"
 	else if test "x$withval" = "xsha512" ;then
-	      CONFIGHMACTYPE="MHASH_SHA512"
+	   CONFIGHMACTYPE="MHASH_SHA512"
         else 
 	   echo "Valid parameters for --with-confighmactype are md5, sha1, sha256 and sha512"
 	   exit 1
@@ -798,7 +799,6 @@ AC_ARG_WITH([confighmactype],
 	AC_DEFINE_UNQUOTED(CONFIGHMACTYPE,$CONFIGHMACTYPE,[hash type for config file check])],
 	[
 	AC_DEFINE_UNQUOTED(CONFIGHMACTYPE,MHASH_MD5,[hash type for config file check])]
-,
 )
 
 AC_ARG_WITH([confighmackey],
@@ -845,18 +845,18 @@ AC_ARG_WITH([confighmackey],
 
 AC_ARG_WITH([dbhmactype],
 	AC_HELP_STRING([--with-dbhmactype=TYPE],
-		[Hash type to use for checking db. Valid values are md5 and sha1.]),
+		[Hash type to use for checking db. Valid values are md5, sha1, sha256 and sha512.]),
 	[if test "x$withval" = "xmd5" ;then
 	   DBHMACTYPE="MHASH_MD5"
 	else if test "x$withval" = "xsha1" ;then
-	      DBHMACTYPE="MHASH_SHA1"
+	   DBHMACTYPE="MHASH_SHA1"
 	else if test "x$withval" = "xsha256" ;then
-	      CONFIGHMACTYPE="MHASH_SHA256"
+	   DBHMACTYPE="MHASH_SHA256"
 	else if test "x$withval" = "xsha512" ;then
-	      CONFIGHMACTYPE="MHASH_SHA512"
+	   DBHMACTYPE="MHASH_SHA512"
         else 
-	      echo "Valid parameters for --with-dbhmactype are md5, sha1, sha256 and sha512"
-	      exit 1
+	   echo "Valid parameters for --with-dbhmactype are md5, sha1, sha256 and sha512"
+	   exit 1
 	fi
 	fi
 	fi

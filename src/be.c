@@ -117,9 +117,9 @@ static char* get_first_value(char** in){
 
 #endif
 
-FILE* be_init(int inout,url_t* u,int iszipped)
+void* be_init(int inout,url_t* u,int iszipped)
 {
-  FILE* fh=NULL;
+  void* fh=NULL;
   long a=0;
   char* err=NULL;
   int fd;

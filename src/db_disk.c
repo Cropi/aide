@@ -79,9 +79,15 @@ static DIR *open_dir(char* path) {
 
 static void next_in_dir (void)
 {
+
 #ifdef HAVE_READDIR_R
-	if (dirh != NULL)
+	if (dirh != NULL) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 		rdres = AIDE_READDIR_R_FUNC (dirh, entp, resp);
+#pragma GCC diagnostic pop
+    }
+
 #else
 #ifdef HAVE_READDIR
 	if (dirh != NULL) {
@@ -119,10 +125,10 @@ static char *name_construct (const char *s)
 
 	ret = (char *) malloc (len);
 	ret[0] = (char) 0;
-	strncpy(ret, conf->root_prefix, conf->root_prefix_length+1);
-	strncat (ret, r->path, len2);
+	strcpy(ret, conf->root_prefix);
+	strcat (ret, r->path);
 	if (r->path[len2 - 1] != '/') {
-		strncat (ret, "/", 1);
+		strcat (ret, "/");
 	}
 	strcat (ret, s);
 	return ret;
@@ -201,9 +207,9 @@ db_line *db_readline_disk ()
 	if (!root_handled) {
 		root_handled = 1;
 		fullname=malloc((conf->root_prefix_length+2)*sizeof(char));
-		strncpy(fullname, conf->root_prefix, conf->root_prefix_length+1);
-		strncat (fullname, "/", 1);
-		if (!get_file_status(&fullname[conf->root_prefix_length], &fs)) {
+		strcpy(fullname, conf->root_prefix);
+		strcat (fullname, "/");
+		if (!get_file_status(fullname, &fs)) {
 		add = check_rxtree (&fullname[conf->root_prefix_length], conf->tree, &attr, fs.st_mode);
 		error (240, "%s match=%d, tree=%p, attr=%llu\n", &fullname[conf->root_prefix_length], add,
 					 conf->tree, attr);
@@ -249,7 +255,7 @@ recursion:
 		   If not call, db_readline_disk again...
 		 */
 
-		if (get_file_status(&fullname[conf->root_prefix_length], &fs)) {
+		if (get_file_status(fullname, &fs)) {
 		    free (fullname);
 		    goto recursion;
 		}
@@ -340,8 +346,8 @@ recursion:
 				error (255, "r->childs %p, r->parent %p,r->checked %i\n",
 							 r->childs, r->parent, r->checked);
 				fullname=malloc((conf->root_prefix_length+strlen(r->path)+1)*sizeof(char));
-				strncpy(fullname, conf->root_prefix, conf->root_prefix_length+1);
-				strncat(fullname, r->path, strlen(r->path));
+				strcpy(fullname, conf->root_prefix);
+				strcat(fullname, r->path);
 				dirh=open_dir(fullname);
 				if (! dirh) {
 
@@ -435,8 +441,8 @@ int db_disk_init ()
 
 
 	char* fullname=malloc((conf->root_prefix_length+2)*sizeof(char));
-	strncpy(fullname, conf->root_prefix, conf->root_prefix_length+1);
-	strncat (fullname, "/", 1);
+	strcpy(fullname, conf->root_prefix);
+	strcat (fullname, "/");
 	dirh=open_dir(fullname);
 	free(fullname);
 

@@ -171,7 +171,7 @@ int dofprintf( const char* s,...)
 int db_file_read_spec(int db){
   
   int i=0;
-  int* db_osize=0;
+  int* db_osize=NULL;
   DB_FIELD** db_order=NULL;
 
   switch (db) {
@@ -187,6 +187,9 @@ int db_file_read_spec(int db){
     db_lineno=&db_new_lineno;
     break;
   }
+  default: {
+    return RETFAIL;
+  }
   }
 
   *db_order=(DB_FIELD*) malloc(1*sizeof(DB_FIELD));
@@ -198,13 +201,10 @@ int db_file_read_spec(int db){
       int l;
       
 
-      /* Yes... we do not check if realloc returns nonnull */
-
-      *db_order=(DB_FIELD*)
-	realloc((void*)*db_order,
+       void * tmp = realloc((void*)*db_order,
 		((*db_osize)+1)*sizeof(DB_FIELD));
-      
-      if(*db_order==NULL){
+      if (tmp != NULL) *db_order=(DB_FIELD*) tmp;
+      else {
 	return RETFAIL;
       }
       
@@ -291,8 +291,8 @@ char** db_readline_file(int db){
   int* domd=NULL;
 #ifdef WITH_MHASH
   MHASH* md=NULL;
-#endif
   char** oldmdstr=NULL;
+#endif
   int* db_osize=0;
   DB_FIELD** db_order=NULL;
   FILE** db_filep=NULL;
@@ -302,9 +302,9 @@ char** db_readline_file(int db){
   case DB_OLD: {
 #ifdef WITH_MHASH
     md=&(conf->dboldmd);
+    oldmdstr=&(conf->old_dboldmdstr);
 #endif
     domd=&(conf->do_dboldmd);
-    oldmdstr=&(conf->old_dboldmdstr);
     
     db_osize=&(conf->db_in_size);
     db_order=&(conf->db_in_order);
@@ -316,9 +316,9 @@ char** db_readline_file(int db){
   case DB_NEW: {
 #ifdef WITH_MHASH
     md=&(conf->dbnewmd);
+    oldmdstr=&(conf->old_dbnewmdstr);
 #endif
     domd=&(conf->do_dbnewmd);
-    oldmdstr=&(conf->old_dbnewmdstr);
     
     db_osize=&(conf->db_new_size);
     db_order=&(conf->db_new_order);
@@ -328,7 +328,9 @@ char** db_readline_file(int db){
     break;
   }
   }
-  
+
+  if (db_osize == NULL) return NULL;
+
   if (*db_osize==0) {
     db_buff(db,*db_filep);
     
@@ -737,8 +739,6 @@ int db_writespec_file(db_config* dbconf)
   int i=0;
   int j=0;
   int retval=1;
-  void*key=NULL;
-  int keylen=0;
   struct tm* st;
   time_t tim=time(&tim);
   st=localtime(&tim);
@@ -750,6 +750,8 @@ int db_writespec_file(db_config* dbconf)
 
 #ifdef WITH_MHASH
   /* From hereon everything must MD'd before write to db */
+  void*key=NULL;
+  int keylen=0;
   if((key=get_db_key())!=NULL){
     keylen=get_db_key_len();
     dbconf->do_dbnewmd=1;

@@ -22,6 +22,6 @@
 #define _BE_H_INCLUDED
 #include "db_config.h"
 
-FILE* be_init(int inout,url_t* u,int iszipped);
+void* be_init(int inout,url_t* u,int iszipped);
 
 #endif /* _BE_H_INCLUDED */

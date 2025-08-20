@@ -133,7 +133,7 @@ int var_in_conflval=0;
 <EXPR>[\ \t]*\n {
   conf_lineno++;
   return (TNEWLINE);
-  BEGIN 0;
+//  BEGIN 0;
 }
 
 <EXPR>\+ {
@@ -399,6 +399,12 @@ int var_in_conflval=0;
   error(230,"%li:root_prefix =\n",conf_lineno);
   BEGIN CONFVALHUNT;
   return (TROOT_PREFIX);
+}
+
+^[\t\ ]*"syslog_format"{E} {
+  error(230,"%li:syslog_format =\n",conf_lineno);
+  BEGIN CONFVALHUNT;
+  return (SYSLOG_FORMAT);
 }
 
 ^[\t\ ]*"recstop"{E} {

@@ -38,6 +38,9 @@
 /*for locale support*/
 #include "util.h"
 
+#define MAX_BUFFER_SIZE 1024
+static char syslog_buffer[MAX_BUFFER_SIZE+1];
+
 int cmp_url(url_t* url1,url_t* url2){
   
   return ((url1->type==url2->type)&&(strcmp(url1->value,url2->value)==0));
@@ -48,7 +51,9 @@ int error_init(url_t* url,int initial)
 {
   list* r=NULL;
   FILE* fh=NULL;
-	int   sfac;
+  int   sfac;
+
+  memset(syslog_buffer, 0, MAX_BUFFER_SIZE+1);
   
   if (url->type==url_database) {
     conf->report_db++;
@@ -120,7 +125,7 @@ int error_init(url_t* url,int initial)
   fh=be_init(0,url,0);
   if(fh!=NULL) {
     conf->report_fd=list_append(conf->report_fd,(void*)fh);
-    conf->report_url=list_append(conf->report_url,(void*)url);
+    conf->report_url=list_append(conf->report_url,(void*)strdup(url));
     return RETOK;
   }
   
@@ -163,13 +168,24 @@ void error(int errorlevel,char* error_msg,...)
     }
 #ifdef HAVE_SYSLOG
     if(conf->initial_report_url->type==url_syslog){
-#ifdef HAVE_VSYSLOG
-      vsyslog(SYSLOG_PRIORITY,error_msg,ap);
-#else
-			char buf[1024];
-			vsnprintf(buf,1024,error_msg,ap);
-			syslog(SYSLOG_PRIORITY,"%s",buf);
-#endif
+
+      char buff[MAX_BUFFER_SIZE+1];
+      vsnprintf(buff,MAX_BUFFER_SIZE,error_msg,ap);
+      size_t buff_len = strlen(buff);
+
+      char result_buff[MAX_BUFFER_SIZE+1];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+      snprintf(result_buff, MAX_BUFFER_SIZE, "%s%s", syslog_buffer, buff);
+#pragma GCC diagnostic pop
+
+      if(buff[buff_len-1] == '\n'){
+        syslog(SYSLOG_PRIORITY,"%s",result_buff);
+        memset(syslog_buffer, 0, MAX_BUFFER_SIZE+1);
+      } else {
+        memcpy(syslog_buffer, result_buff, MAX_BUFFER_SIZE);
+      }
+
       va_end(ap);
       return;
     }
@@ -181,17 +197,25 @@ void error(int errorlevel,char* error_msg,...)
 
 #ifdef HAVE_SYSLOG
   if (conf->report_syslog!=0) {
-#ifdef HAVE_VSYSLOG
-    va_start(ap,error_msg);
-    vsyslog(SYSLOG_PRIORITY,error_msg,ap);
+    va_start(ap, error_msg);
+
+    char buff[MAX_BUFFER_SIZE+1];
+    vsnprintf(buff,MAX_BUFFER_SIZE,error_msg,ap);
+    size_t buff_len = strlen(buff);
+
+    char result_buff[MAX_BUFFER_SIZE+1];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+    snprintf(result_buff, MAX_BUFFER_SIZE, "%s%s", syslog_buffer, buff);
+#pragma GCC diagnostic pop
+
+    if(buff[buff_len-1] == '\n'){
+      syslog(SYSLOG_PRIORITY,"%s",result_buff);
+      memset(syslog_buffer, 0, MAX_BUFFER_SIZE+1);
+    } else {
+      memcpy(syslog_buffer, result_buff, MAX_BUFFER_SIZE);
+    }
     va_end(ap);
-#else
-		char buf[1024];
-    va_start(ap,error_msg);
-		vsnprintf(buf,1024,error_msg,ap);
-    va_end(ap);
-		syslog(SYSLOG_PRIORITY,"%s",buf);
-#endif
   }
 #endif
 

@@ -85,11 +85,9 @@ FAIL, FAIL, FAIL, FAIL, FAIL, FAIL, FAIL, FAIL
 };
 
 /* Returns NULL on error */
-/* FIXME Possible buffer overflow on outputs larger than B64_BUF */
 char* encode_base64(byte* src,size_t ssize)
 {
   char* outbuf;
-  char* retbuf;
   int pos;
   int i, l, left;
   unsigned long triple;
@@ -101,7 +99,10 @@ char* encode_base64(byte* src,size_t ssize)
     error(240,"\n");
     return NULL;
   }
-  outbuf = (char *)malloc(sizeof(char)*B64_BUF);
+
+  /* length of encoded base64 string (padded) */
+  size_t length = sizeof(char)* ((ssize + 2) / 3) * 4;
+  outbuf = (char *)malloc(length + 1);
   
   /* Initialize working pointers */
   inb = src;
@@ -162,20 +163,14 @@ char* encode_base64(byte* src,size_t ssize)
       inb++;
   }
   
-  /* outbuf is not completely used so we use retbuf */
-  retbuf=(char*)malloc(sizeof(char)*(pos+1));
-  memcpy(retbuf,outbuf,pos);
-  retbuf[pos]='\0';
-  free(outbuf);
+  outbuf[pos]='\0';
 
-  return retbuf;
+  return outbuf;
 }
 
-/* FIXME Possible buffer overflow on outputs larger than B64_BUF */
 byte* decode_base64(char* src,size_t ssize, size_t *ret_len)
 {
   byte* outbuf;
-  byte* retbuf;
   char* inb;
   int i;
   int l;
@@ -188,10 +183,18 @@ byte* decode_base64(char* src,size_t ssize, size_t *ret_len)
   if (!ssize||src==NULL)
     return NULL;
 
+  /* exit on unpadded input */
+  if (ssize % 4) {
+    error(3, "decode_base64: '%s' has invalid length (missing padding characters?)", src);
+    return NULL;
+  }
+
+  /* calculate length of decoded string, substract padding chars if any (ssize is >= 4) */
+  size_t length = sizeof(byte) * ((ssize / 4) * 3)- (src[ssize-1] == '=') - (src[ssize-2] == '=');
 
   /* Initialize working pointers */
   inb = src;
-  outbuf = (byte *)malloc(sizeof(byte)*B64_BUF);
+  outbuf = (byte *)malloc(length + 1);
 
   l = 0;
   triple = 0;
@@ -209,6 +212,7 @@ byte* decode_base64(char* src,size_t ssize, size_t *ret_len)
 	case FAIL:
 	  error(3, "decode_base64: Illegal character: %c\n", *inb);
 	  error(230, "decode_base64: Illegal line:\n%s\n", src);
+	  free(outbuf);
 	  return NULL;
 	  break;
 	case SKIP:
@@ -242,15 +246,11 @@ byte* decode_base64(char* src,size_t ssize, size_t *ret_len)
       inb++;
     }
   
-  retbuf=(byte*)malloc(sizeof(byte)*(pos+1));
-  memcpy(retbuf,outbuf,pos);
-  retbuf[pos]='\0';
-  
-  free(outbuf);
+  outbuf[pos]='\0';
 
   if (ret_len) *ret_len = pos;
   
-  return retbuf;
+  return outbuf;
 }
 
 size_t length_base64(char* src,size_t ssize)
@@ -260,7 +260,7 @@ size_t length_base64(char* src,size_t ssize)
   int l;
   int left;
   size_t pos;
-  unsigned long triple;
+  //unsigned long triple;
 
   error(235, "decode base64\n");
   /* Exit on empty input */
@@ -273,7 +273,7 @@ size_t length_base64(char* src,size_t ssize)
   inb = src;
 
   l = 0;
-  triple = 0;
+  //triple = 0;
   pos=0;
   left = ssize;
   /*
@@ -293,7 +293,7 @@ size_t length_base64(char* src,size_t ssize)
 	case SKIP:
 	  break;
 	default:
-	  triple = triple<<6 | (0x3f & i);
+	  //triple = triple<<6 | (0x3f & i);
 	  l++;
 	  break;
 	}
@@ -302,10 +302,10 @@ size_t length_base64(char* src,size_t ssize)
 	  switch(l)
 	    {
 	    case 2:
-	      triple = triple>>4;
+	      //triple = triple>>4;
 	      break;
 	    case 3:
-	      triple = triple>>2;
+	      //triple = triple>>2;
 	      break;
 	    default:
 	      break;
@@ -314,7 +314,7 @@ size_t length_base64(char* src,size_t ssize)
 	    {
 	      pos++;
 	    }
-	  triple = 0;
+	  //triple = 0;
 	  l = 0;
 	}
       inb++;

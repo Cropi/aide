@@ -843,14 +843,14 @@ static void add_file_to_tree(seltree* tree,db_line* file,int db,
   DB_ATTR_TYPE localignorelist=0;
   DB_ATTR_TYPE ignored_added_attrs, ignored_removed_attrs, ignored_changed_attrs;
 
+  if(file==NULL){
+    error(0, "add_file_to_tree was called with NULL db_line\n");
+  }
+
   node=get_seltree_node(tree,file->filename);
 
   if(!node){
     node=new_seltree_node(tree,file->filename,0,NULL);
-  }
-  
-  if(file==NULL){
-    error(0, "add_file_to_tree was called with NULL db_line\n");
   }
 
   /* add note to this node which db has modified it */

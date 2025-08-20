@@ -278,11 +278,12 @@ static void setdefaults_before_config()
     error(0,_("Couldn't get hostname"));
     free(s);
   } else {
-    s=(char*)realloc((void*)s,strlen(s)+1);
+  //  s=(char*)realloc((void*)s,strlen(s)+1);
     do_define("HOSTNAME",s);
   }
   
   /* Setting some defaults */
+  conf->syslog_format=0;
   conf->report_db=0;  
   conf->tree=NULL;
   conf->config_check=0;
@@ -348,7 +349,7 @@ static void setdefaults_before_config()
 
   conf->db_attrs = 0;
 #if defined(WITH_MHASH) || defined(WITH_GCRYPT)
-  conf->db_attrs |= DB_MD5|DB_TIGER|DB_HAVAL|DB_CRC32|DB_SHA1|DB_RMD160|DB_SHA256|DB_SHA512;
+  conf->db_attrs |= get_available_crypto();
 #ifdef WITH_MHASH
   conf->db_attrs |= DB_GOST;
 #ifdef HAVE_MHASH_WHIRLPOOL
@@ -495,14 +496,16 @@ static void setdefaults_after_config()
   if(conf->verbose_level==-1){
     conf->verbose_level=5;
   }
+  if(conf->syslog_format==1){
+    conf->verbose_level=0;
+  }
+
 }
 
 
 int main(int argc,char**argv)
 {
   int errorno=0;
-  byte* dig=NULL;
-  char* digstr=NULL;
 
 #ifdef USE_LOCALE
   setlocale(LC_ALL,"");
@@ -511,8 +514,27 @@ int main(int argc,char**argv)
 #endif
   umask(0177);
   init_sighandler();
-
   setdefaults_before_config();
+
+#if WITH_GCRYPT
+  error(255,"Gcrypt library initialization\n");
+  /*
+   *  Initialize libgcrypt as per
+   *  http://www.gnupg.org/documentation/manuals/gcrypt/Initializing-the-library.html
+   *
+   *
+   */
+  gcry_control(GCRYCTL_SET_ENFORCED_FIPS_FLAG, 0);
+  gcry_control(GCRYCTL_INIT_SECMEM, 1);
+
+  if(!gcry_check_version(GCRYPT_VERSION)) {
+      error(0,"libgcrypt version mismatch\n");
+      exit(VERSION_MISMATCH_ERROR);
+  }
+
+  gcry_control(GCRYCTL_INITIALIZATION_FINISHED, 0);
+#endif /* WITH_GCRYPT */
+
 
   if(read_param(argc,argv)==RETFAIL){
     error(0, _("Invalid argument\n") );
@@ -520,6 +542,10 @@ int main(int argc,char**argv)
   }
   
   errorno=commandconf('C',conf->config_file);
+  if (errorno==RETFAIL){
+    error(0,_("Configuration error\n"));
+    exit(INVALID_CONFIGURELINE_ERROR);
+  }
 
   errorno=commandconf('D',"");
   if (errorno==RETFAIL){
@@ -570,6 +596,9 @@ int main(int argc,char**argv)
       }
   }
 #ifdef WITH_MHASH
+  byte* dig=NULL;
+  char* digstr=NULL;
+
   if(conf->config_check&&FORCECONFIGMD){
     error(0,"Can't give config checksum when compiled with --enable-forced_configmd\n");
     exit(INVALID_ARGUMENT_ERROR);
@@ -646,6 +675,9 @@ int main(int argc,char**argv)
     }
 #endif
   }
+#ifdef WITH_GCRYPT
+  gcry_control(GCRYCTL_TERM_SECMEM, 0);
+#endif /* WITH_GCRYPT */
   return RETOK;
 }
 const char* aide_key_3=CONFHMACKEY_03;

@@ -36,8 +36,8 @@
 */
 
 DB_ATTR_TYPE hash_gcrypt2attr(int i) {
-  DB_ATTR_TYPE r=0;
 #ifdef WITH_GCRYPT
+  DB_ATTR_TYPE r=0;
   switch (i) {
   case GCRY_MD_MD5: {
     r=DB_MD5;
@@ -74,13 +74,62 @@ DB_ATTR_TYPE hash_gcrypt2attr(int i) {
   default:
     break;
   }
-#endif
   return r;
+#else /* !WITH_GCRYPT */
+  return 0;
+#endif
 }
 
+const char * hash_gcrypt2str(int i) {
+#ifdef WITH_GCRYPT
+  char * r = "?";
+  switch (i) {
+  case GCRY_MD_MD5: {
+    r = "MD5";
+    break;
+  }
+  case GCRY_MD_SHA1: {
+    r = "SHA1";
+    break;
+  }
+  case GCRY_MD_RMD160: {
+    r = "RMD160";
+    break;
+  }
+  case GCRY_MD_TIGER: {
+    r = "TIGER";
+    break;
+  }
+  case GCRY_MD_HAVAL: {
+    r = "HAVAL";
+    break;
+  }
+  case GCRY_MD_SHA256: {
+    r = "SHA256";
+    break;
+  }
+  case GCRY_MD_SHA512: {
+    r = "SHA512";
+    break;
+  }
+  case GCRY_MD_CRC32: {
+    r = "CRC32";
+    break;
+  }
+  default:
+    break;
+  }
+  return r;
+#else /* !WITH_GCRYPT */
+  return "?";
+#endif
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 DB_ATTR_TYPE hash_mhash2attr(int i) {
-  DB_ATTR_TYPE r=0;
 #ifdef WITH_MHASH
+  DB_ATTR_TYPE r=0;
   switch (i) {
   case MHASH_CRC32: {
     r=DB_CRC32;
@@ -155,13 +204,56 @@ DB_ATTR_TYPE hash_mhash2attr(int i) {
   default:
     break;
   }
-#endif
+
   return r;
+#else /*!WITH_MHASH */
+  return 0;
+#endif
 }
+
+#pragma GCC diagnostic pop
 
 /*
   Initialise md_container according it's todo_attr field
  */
+
+DB_ATTR_TYPE get_available_crypto() {
+  
+  DB_ATTR_TYPE ret = 0;
+
+/*
+ * This function is usually called before config processing
+ * and default verbose level is 5
+ */
+#define lvl 255
+
+  error(lvl, "get_available_crypto called\n");
+
+#ifdef WITH_GCRYPT
+
+  /*
+ * some initialization for FIPS
+ */
+  gcry_check_version(NULL);
+  error(lvl, "Found algos:");
+
+  for(int i=0;i<=HASH_GCRYPT_COUNT;i++) {
+
+    if ( (hash_gcrypt2attr(i) & HASH_USE_GCRYPT) == 0 )
+      continue;
+  
+    if (gcry_md_algo_info(i, GCRYCTL_TEST_ALGO, NULL, NULL) == 0) {
+      ret |= hash_gcrypt2attr(i);
+      error(lvl, " %s", hash_gcrypt2str(i));
+    }
+  }
+  error(lvl, "\n");
+
+#endif
+
+  error(lvl, "get_available_crypto_returned with %lld\n", ret);
+  return ret;
+}
 
 int init_md(struct md_container* md) {
   
@@ -201,25 +293,27 @@ int init_md(struct md_container* md) {
   }
 #endif 
 #ifdef WITH_GCRYPT
-  error(255,"Gcrypt library initialization\n");
-  	if(!gcry_check_version(GCRYPT_VERSION)) {
-		error(0,"libgcrypt version mismatch\n");
-		exit(VERSION_MISMATCH_ERROR);
-	}
-	gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
-	gcry_control(GCRYCTL_INITIALIZATION_FINISHED, 0);
-	if(gcry_md_open(&md->mdh,0,0)!=GPG_ERR_NO_ERROR){
+  if(gcry_md_open(&md->mdh,0,GCRY_MD_FLAG_SECURE)!=GPG_ERR_NO_ERROR){
 		error(0,"gcrypt_md_open failed\n");
 		exit(IO_ERROR);
 	}
   for(i=0;i<=HASH_GCRYPT_COUNT;i++) {
+
+
     if (((hash_gcrypt2attr(i)&HASH_USE_GCRYPT)&md->todo_attr)!=0) {
-      DB_ATTR_TYPE h=hash_gcrypt2attr(i);
-      error(255,"inserting %llu\n",h);
+
+        DB_ATTR_TYPE h=hash_gcrypt2attr(i);
+
+        if (gcry_md_algo_info(i, GCRYCTL_TEST_ALGO, NULL, NULL) != 0) {
+            error(0,"Algo %s is not available\n", hash_gcrypt2str(i));
+            exit(-1);
+        }
+
+        error(255,"inserting %llu\n",h);
 			if(gcry_md_enable(md->mdh,i)==GPG_ERR_NO_ERROR){
 				md->calc_attr|=h;
 			} else {
-				error(0,"gcry_md_enable %i failed",i);
+				error(0,"gcry_md_enable %i failed\n",i);
 				md->todo_attr&=~h;
 			}
 		}
@@ -234,7 +328,6 @@ int init_md(struct md_container* md) {
  */
 
 int update_md(struct md_container* md,void* data,ssize_t size) {
-  int i;
     
   error(255,"update_md called\n");
 
@@ -245,6 +338,7 @@ int update_md(struct md_container* md,void* data,ssize_t size) {
 #endif
 
 #ifdef WITH_MHASH
+  int i;
   
   for(i=0;i<=HASH_MHASH_COUNT;i++) {
     if (md->mhash_mdh[i]!=MHASH_FAILED) {
@@ -265,7 +359,6 @@ int update_md(struct md_container* md,void* data,ssize_t size) {
 */
 
 int close_md(struct md_container* md) {
-  int i;
 #ifdef _PARAMETER_CHECK_
   if (md==NULL) {
     return RETFAIL;
@@ -273,6 +366,7 @@ int close_md(struct md_container* md) {
 #endif
   error(255,"close_md called \n");
 #ifdef WITH_MHASH
+  int i;
   for(i=0;i<=HASH_MHASH_COUNT;i++) {
     if (md->mhash_mdh[i]!=MHASH_FAILED) {
       mhash (md->mhash_mdh[i], NULL, 0);
@@ -299,7 +393,7 @@ int close_md(struct md_container* md) {
   
   /*.    There might be more hashes in the library. Add those here..   */
   
-  gcry_md_reset(md->mdh);
+  gcry_md_close(md->mdh);
 #endif  
 
 #ifdef WITH_MHASH

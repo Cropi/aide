@@ -311,6 +311,7 @@ typedef struct db_config {
   FILE* db_out;
   
   int config_check;
+  int syslog_format;
 
   struct md_container *mdc_in;
   struct md_container *mdc_out;
@@ -375,7 +376,7 @@ typedef struct db_config {
 #endif
 
   url_t* initial_report_url;
-  FILE* initial_report_fd;
+  void* initial_report_fd;
   
   /* report_url is a list of url_t*s */
   list* report_url;

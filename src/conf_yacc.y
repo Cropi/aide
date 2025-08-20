@@ -89,6 +89,7 @@ extern long conf_lineno;
 %token TREPORT_URL
 %token TGZIPDBOUT
 %token TROOT_PREFIX
+%token SYSLOG_FORMAT
 %token TUMASK
 %token TTRUE
 %token TFALSE
@@ -160,7 +161,7 @@ line : rule | equrule | negrule | definestmt | undefstmt
        | ifdefstmt | ifndefstmt | ifhoststmt | ifnhoststmt
        | groupdef | db_in | db_out | db_new | db_attrs | verbose | report_detailed_init | config_version
        | database_add_metadata | report | gzipdbout | root_prefix | report_base16 | report_quiet
-       | report_ignore_e2fsattrs | recursion_stopper | warn_dead_symlinks | grouped
+       | report_ignore_e2fsattrs | syslogformat | recursion_stopper | warn_dead_symlinks | grouped
        | summarize_changes | acl_no_symlink_follow | beginconfigstmt | endconfigstmt
        | TEOF {
             newlinelastinconfig=1;
@@ -407,6 +408,15 @@ conf->gzip_dbout=1;
 conf->gzip_dbout=0; 
 #endif
 } ;
+
+syslogformat : SYSLOG_FORMAT TTRUE {
+conf->syslog_format=1;
+} |
+               SYSLOG_FORMAT TFALSE {
+conf->syslog_format=0;
+} ;
+
+
 
 recursion_stopper : TRECSTOP TSTRING {
   /* FIXME implement me */  

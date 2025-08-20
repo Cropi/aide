@@ -106,7 +106,7 @@ int commandconf(const char mode,const char* line)
       rv=0;
     } else {
       
-      rv=access(config,R_OK);
+      if (config != NULL) rv=access(config,R_OK);
       if(rv==-1){
 	error(0,_("Cannot access config file: %s: %s\n"),config,strerror(errno));
       }
@@ -166,14 +166,11 @@ int commandconf(const char mode,const char* line)
 int conf_input_wrapper(char* buf, int max_size, FILE* in)
 {
   int retval=0;
-  int c=0;
-  char* tmp=NULL;
-  void* key=NULL;
-  int keylen=0;
 
   /* FIXME Add support for gzipped config. :) */
 #ifdef WITH_MHASH
   /* Read a character at a time until we are doing md */
+  int c=0;
   if(conf->do_configmd){
     retval=fread(buf,1,max_size,in);
   }else {
@@ -185,6 +182,9 @@ int conf_input_wrapper(char* buf, int max_size, FILE* in)
 #endif 
 
 #ifdef WITH_MHASH    
+  char* tmp=NULL;
+  void* key=NULL;
+  int keylen=0;
   if(conf->do_configmd||conf->config_check){
     if(((conf->do_configmd==1)&&conf->config_check)||!conf->confmd){
       if(conf->do_configmd==1){
@@ -276,6 +276,9 @@ int db_input_wrapper(char* buf, int max_size, int db)
 #endif
     break;
   }
+  default: {
+    return 0;
+  }
   }
 
 #ifdef WITH_CURL
@@ -303,6 +306,7 @@ int db_input_wrapper(char* buf, int max_size, int db)
       retval=0;
       buf[0]='\0';
     }else {
+      buf[0]='\0';
       if((retval=gzread(*db_gzp,buf,max_size))<0){
 	error(0,_("gzread() failed: gzerr=%s!\n"),gzerror(*db_gzp,&err));
 	retval=0;
@@ -310,7 +314,7 @@ int db_input_wrapper(char* buf, int max_size, int db)
       } else {
 	/* gzread returns 0 even if uncompressed bytes were read*/
 	error(240,"nread=%d,strlen(buf)=%lu,errno=%s,gzerr=%s\n",
-              retval,(unsigned long)strnlen((char*)buf, max_size),
+              retval,(unsigned long)strnlen((char*)buf, retval),
               strerror(errno),gzerror(*db_gzp,&err));
 	if(retval==0){
 	  retval=strnlen((char*)buf, max_size);
@@ -651,7 +655,6 @@ int handle_endif(int doit,int allow_else){
       case 0 : {
 	conferror("@@endif or @@else expected");
 	return -1;
-	count=0;
       }
       
       default : {
@@ -816,6 +819,7 @@ void do_dbdef(int dbtype,char* val)
       if(u==NULL||u->type==url_unknown||u->type==url_stdout
 	 ||u->type==url_stderr) {
 	error(0,_("Unsupported input URL-type:%s\n"),val);
+	free(u);
       }
       else {
 	*conf_db_url=u;
@@ -825,11 +829,17 @@ void do_dbdef(int dbtype,char* val)
     case DB_WRITE: {
       if(u==NULL||u->type==url_unknown||u->type==url_stdin){
 	error(0,_("Unsupported output URL-type:%s\n"),val);
+	free(u);
       }
       else{
 	conf->db_out_url=u;
 	error(200,_("Output database set to \"%s\" \"%s\"\n"),val,u->value);
       }
+      break;
+    }
+    default: {
+      error(0,"Unsupported dbtype.\n");
+      free(u);
       break;
     }
     }
@@ -848,6 +858,7 @@ void do_dbindef(char* val)
     if(u==NULL||u->type==url_unknown||u->type==url_stdout
        ||u->type==url_stderr) {
       error(0,_("Unsupported input URL-type:%s\n"),val);
+      free(u);
     }
     else {
       conf->db_in_url=u;
@@ -869,6 +880,7 @@ void do_dboutdef(char* val)
      * both input and output urls */
     if(u==NULL||u->type==url_unknown||u->type==url_stdin){
       error(0,_("Unsupported output URL-type:%s\n"),val);
+      free(u);
     }
     else{
       conf->db_out_url=u;
@@ -894,7 +906,8 @@ void do_repurldef(char* val)
   } else {
     error_init(u,0);
   }
-  
+  free(u->value);
+  free(u);  
 }
 
 void do_verbdef(char* val)
@@ -984,7 +997,7 @@ void do_report_ignore_e2fsattrs(char* val) {
                  break;
             }
         }
-        *val++;
+        val++;
     }
 }
 #endif

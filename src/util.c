@@ -105,22 +105,29 @@ url_t* parse_url(char* val)
       for(i=0;r[0]!='/'&&r[0]!='\0';r++,i++);
       if(r[0]=='\0'){
 	error(0,"Invalid file-URL,no path after hostname: file:%s\n",t);
+        free(u);
+        free(val_copy);
+        free(hostname);
 	return NULL;
       }
       u->value=strdup(r);
       r[0]='\0';
       if(gethostname(hostname,MAXHOSTNAMELEN)==-1){
-    strncpy(hostname,"localhost", 10);
+        strncpy(hostname,"localhost",MAXHOSTNAMELEN);
       }
+
       if( (strcmp(t,"localhost")==0)||(strcmp(t,hostname)==0)){
 	free(hostname);
 	break;
       } else {
 	error(0,"Invalid file-URL, cannot use hostname other than localhost or %s: file:%s\n",hostname,u->value);
+        free(u->value);
+        free(u);
+        free(val_copy);
 	free(hostname);
 	return NULL;
       }
-      free(hostname);
+
       break;
     }
     u->value=strdup(r);
@@ -227,6 +234,10 @@ char* perm_to_char(mode_t perm)
   int i=0;
   
   pc=(char*)malloc(sizeof(char)*11);
+  if (!pc) {
+    error(0, "Memory allocation failed.\n");
+    return NULL;
+  }
   for(i=0;i<10;i++){
     pc[i]='-';
   }
@@ -367,14 +378,17 @@ char *expand_tilde(char *path) {
 
     if (path != NULL) {
         if (path[0] == '~') {
-            if((homedir=getenv("HOME")) != NULL) {
+            if ((homedir=getenv("HOME")) != NULL) {
                 path_len = strlen(path+sizeof(char));
                 homedir_len = strlen(homedir);
                 full_len = homedir_len+path_len;
                 full = malloc(sizeof(char) * (full_len+1));
-                strncpy(full, homedir, homedir_len);
-                strncpy(full+homedir_len, path+sizeof(char), path_len);
-                full[full_len] = '\0';
+                if (!full) {
+                    error(0, "Memory allocation failed.\n");
+                    return path;
+                }
+                strcpy(full, homedir);
+                strcat(full, path+sizeof(char));
                 free(path);
                 /* Don't free(homedir); because it is not safe on some platforms */
                 path = full;
@@ -517,29 +531,6 @@ int syslog_facility_lookup(char *s)
 
 	error(0,"Syslog facility \"%s\" is unknown, using default\n",s);
 	return(AIDE_SYSLOG_FACILITY);
-}
-
-/* We need these dummy stubs to fool the linker into believing that
-   we do not need them at link time */
-
-void* dlopen(char*filename,int flag)
-{
-  return NULL;
-}
-
-void* dlsym(void*handle,char*symbol)
-{
-  return NULL;
-}
-
-void* dlclose(void*handle)
-{
-  return NULL;
-}
-
-const char* dlerror(void)
-{
-  return NULL;
 }
 
 const char* aide_key_2=CONFHMACKEY_02;
