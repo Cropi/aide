@@ -48,6 +48,7 @@ typedef enum {
     REPORT_FORMAT_UNKNOWN = 0,
     REPORT_FORMAT_PLAIN = 1,
     REPORT_FORMAT_JSON = 2,
+    REPORT_FORMAT_SYSLOG = 3,
 } REPORT_FORMAT;
 
 extern const ATTRIBUTE report_attrs_order[];
@@ -137,6 +138,8 @@ typedef struct report_format_module {
     void (*print_report_starttime_version)(report_t*, const char*, const char*);
     void (*print_report_summary)(report_t*);
 } report_format_module;
+
+DB_ATTR_TYPE get_report_attributes(seltree*, report_t*);
 
 char* get_file_type_string(mode_t);
 char* get_summarize_changes_string(report_t*, seltree*);

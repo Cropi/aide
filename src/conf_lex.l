@@ -362,6 +362,13 @@ LOG_LEVEL lex_log_level = LOG_LEVEL_DEBUG;
   BEGIN (STRINGEQHUNT);
   return (CONFIGOPTION);
 }
+<CONFIG>"syslog_format" {
+  LOG_LEX_TOKEN(lex_log_level, CONFIGOPTION (SYSLOG_FORMAT_OPTION), conftext)
+  conflval.option = SYSLOG_FORMAT_OPTION;
+  BEGIN (STRINGEQHUNT);
+  return (CONFIGOPTION);
+}
+
 
 <CONFIG>"report_level" {
   LOG_LEX_TOKEN(lex_log_level, CONFIGOPTION (REPORT_LEVEL_OPTION), conftext)

@@ -266,6 +266,34 @@ The report format to use. The available report formats are as follows:
 
 \fBjson\fP: Print report in json machine-readable format.
 .RE
+.IP "syslog_format (type: bool, default: \fBno\fR)"
+Valid values are \fByes\fR, \fBtrue\fR, \fBno\fR and \fBfalse\fR.
+
+When enabled, the standard multi-line report is replaced with a compact
+semicolon-delimited format where every file event is emitted as a single line.
+This ensures that when used with \fBreport_url=syslog:\fILOG_FACILITY\fR, exactly
+one syslog message is produced per changed, added, or removed file.
+
+Output starts with a header line when differences are found:
+.nf
+AIDE found differences between database and filesystem!!
+.fi
+Followed by a summary line:
+.nf
+summary;total_number_of_files=\fIN\fP;added_files=\fIN\fP;removed_files=\fIN\fP;changed_files=\fIN\fP
+.fi
+Then one line per changed, added, or removed entry:
+.nf
+file=/usr/sbin/sshd;Mtime_old=...;Mtime_new=...;SHA256_old=...;SHA256_new=...
+dir=/etc/cron.d; added
+file=/usr/bin/old; removed
+.fi
+
+The maximum size of a single syslog message depends on the syslog daemon
+(typically 1\(en8\ KB). Lines exceeding this limit will be silently truncated
+by the syslog daemon. This is not controlled by AIDE.
+
+The \fBreport_summarize_changes\fR option has no effect in this format.
 
 .IP "report_base16 (type: bool, default: \fBfalse\fR, added in AIDE v0.17)"
 Base16 encode the checksums in the report. The default is to

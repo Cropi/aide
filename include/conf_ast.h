@@ -53,6 +53,7 @@ typedef enum config_option {
     REPORT_FORMAT_OPTION,
     LIMIT_CMDLINE_OPTION,
     NUM_WORKERS,
+    SYSLOG_FORMAT_OPTION,
 } config_option;
 
 typedef struct {

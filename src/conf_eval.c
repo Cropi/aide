@@ -264,6 +264,9 @@ static void eval_config_statement(config_option_statement statement, int linenum
             REPORT_FORMAT report_format = get_report_format(str);
             if (report_format != REPORT_FORMAT_UNKNOWN) {
                 conf->report_format = report_format;
+                for (list *l = conf->report_urls; l; l = l->next) {
+                    ((report_t *)l->data)->format = report_format;
+                }
                 LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_CONFIG, "set 'report_format' option to '%s' (raw: %d)", str, report_format)
             } else {
                 LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "invalid report format: '%s'", str);
@@ -314,6 +317,11 @@ static void eval_config_statement(config_option_statement statement, int linenum
             } else {
                     LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_NOTICE, "'num_workers' option already set (ignore new value '%s')", str)
             }
+            break;
+        case SYSLOG_FORMAT_OPTION:
+            b = string_expression_to_bool(statement.e, linenumber, filename, linebuf);
+            conf->syslog_format = b;
+            LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_CONFIG, "set 'syslog_format' to '%s'", btoa(b))
             break;
     }
 }

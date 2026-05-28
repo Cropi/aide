@@ -59,6 +59,7 @@
 #include "report.h"
 #include "report_plain.h"
 #include "report_json.h"
+#include "report_syslog.h"
 /*for locale support*/
 #include "locale-aide.h"
 /*for locale support*/
@@ -146,6 +147,7 @@ struct report_format {
 static struct report_format report_format_array[] = {
  { REPORT_FORMAT_PLAIN, "plain" },
  { REPORT_FORMAT_JSON, "json" },
+ { REPORT_FORMAT_SYSLOG, "syslog" },
  { REPORT_FORMAT_UNKNOWN, NULL }
 };
 
@@ -510,6 +512,15 @@ bool init_report_urls(void) {
     }
 
     }
+    /* syslog_format is a downstream-only option that must win over report_format
+     * regardless of declaration order in the config file.  Enforce it here,
+     * after the entire config AST has been evaluated, so no subsequent
+     * report_format setting can accidentally override the user's intent. */
+    if (conf->syslog_format) {
+        for (l=conf->report_urls; l; l=l->next) {
+            ((report_t *)l->data)->format = REPORT_FORMAT_SYSLOG;
+        }
+    }
     return true;
 }
 
@@ -677,7 +688,7 @@ char* get_summarize_changes_string(report_t* report, seltree* node) {
 
 
 
-static DB_ATTR_TYPE get_report_attributes(seltree* node, report_t *report) {
+DB_ATTR_TYPE get_report_attributes(seltree* node, report_t *report) {
     db_line* oline = node->old_data;
     db_line* nline = node->new_data;
     DB_ATTR_TYPE attrs = node->changed_attrs;
@@ -965,6 +976,9 @@ int gen_report(seltree* node) {
                 break;
             case REPORT_FORMAT_JSON:
                 print_report(report, node, report_module_json);
+                break;
+            case REPORT_FORMAT_SYSLOG:
+                print_report(report, node, report_module_syslog);
                 break;
             case REPORT_FORMAT_UNKNOWN:
                 /* skip unknown report format */

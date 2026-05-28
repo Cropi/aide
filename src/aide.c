@@ -439,6 +439,7 @@ static void setdefaults_before_config(void)
   conf->report_detailed_init=0;
   conf->report_base16=0;
   conf->report_quiet=0;
+  conf->syslog_format=0;
   conf->report_append=false;
   conf->report_ignore_added_attrs = 0;
   conf->report_ignore_removed_attrs = 0;

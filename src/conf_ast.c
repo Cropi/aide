@@ -58,6 +58,7 @@ config_option_t config_options[] = {
     { REPORT_FORMAT_OPTION,                     NULL,                           NULL },
     { LIMIT_CMDLINE_OPTION,                     "limit",                        "Limit" },
     { NUM_WORKERS,                              NULL,                           NULL },
+    { SYSLOG_FORMAT_OPTION,                     NULL,                           NULL },
 };
 
 static ast* new_ast_node(void) {
