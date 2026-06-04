@@ -611,13 +611,13 @@ static void include_directory(const char* dir, const char* rx, bool execute, cha
 
     struct stat fs;
 
-    if (execute) {
-        if (stat(dir,&fs) == -1) {
-            LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'@@x_include': stat for '%s' failed: %s", dir, strerror(errno))
-            exit(INVALID_CONFIGURELINE_ERROR);
-        }
-        check_permissions(dir, &fs, "@@x_include", linenumber, filename, linebuf);
+    /* stat() follows symlinks; we intentionally check the target's ownership
+     * and mode rather than the symlink node itself */
+    if (stat(dir,&fs) == -1) {
+        LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'%s': stat for '%s' failed: %s", execute?"@@x_include":"@@include", dir, strerror(errno))
+        exit(INVALID_CONFIGURELINE_ERROR);
     }
+    check_permissions(dir, &fs, execute?"@@x_include":"@@include", linenumber, filename, linebuf);
 
     n = scandir(dir, &namelist, dirfilter, alphasort);
     if (n == -1) {
@@ -660,9 +660,8 @@ static void include_directory(const char* dir, const char* rx, bool execute, cha
                 log_msg(LOG_LEVEL_DEBUG,"%s: skip '%s' (reason: file name does not match regex '%s')", dir, namelist[i]->d_name, rx);
             } else {
                 int exec = execute && S_IXUSR&fs.st_mode;
-                if (exec) {
-                    check_permissions(filepath, &fs, "@@x_include", linenumber, filename, linebuf);
-                }
+                /* pass directive name (not exec flag) so the error names the directive the user wrote */
+                check_permissions(filepath, &fs, execute?"@@x_include":"@@include", linenumber, filename, linebuf);
                 log_msg(LOG_LEVEL_CONFIG,"%s: %s '%s'", dir, exec?"execute":"include", namelist[i]->d_name);
                 include_file(filepath, exec, include_depth, nested_rule_prefix);
             }
@@ -701,14 +700,15 @@ static void eval_include_statement(include_statement statement, int include_dept
     } else {
     struct stat fs;
     if (lstat(path,&fs) == -1) {
-        LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'@@include': lstat for '%s' failed: %s", path, strerror(errno))
+        LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'%s': lstat for '%s' failed: %s", statement.execute?"@@x_include":"@@include", path, strerror(errno))
         exit(INVALID_CONFIGURELINE_ERROR);
     }
     if (S_ISREG(fs.st_mode)) {
+        check_permissions(path, &fs, statement.execute?"@@x_include":"@@include", linenumber, filename, linebuf);
         LOG_CONFIG_FORMAT_LINE_PREFIX(LOG_LEVEL_CONFIG, "include file '%s' (depth: %d)", path, include_depth)
         include_file(path, statement.execute && S_IXUSR&fs.st_mode, include_depth, rule_prefix);
     } else {
-        LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'@@include': '%s' is not a regular file", path);
+        LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'%s': '%s' is not a regular file", statement.execute?"@@x_include":"@@include", path);
         exit(INVALID_CONFIGURELINE_ERROR);
     }
     }
