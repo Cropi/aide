@@ -580,9 +580,9 @@ static void include_file(const char* file, bool execute, int include_depth, char
     }
 }
 
-void check_permissions(const char* path, struct stat *st, int linenumber, char *filename, char* linebuf) {
+static void check_permissions(const char* path, struct stat *st, const char *directive, int linenumber, char *filename, char* linebuf) {
     if ((st->st_uid != geteuid() && st->st_uid != 0) || (st->st_mode & 002) != 0 || (st->st_mode & 020) != 0) {
-        LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'@@x_include': bad ownership or modes for '%s' (please ensure it is neither group- nor world-writable and owned by the current user or root)", path)
+        LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'%s': bad ownership or modes for '%s' (please ensure it is neither group- nor world-writable and owned by the current user or root)", directive, path)
         exit(INVALID_CONFIGURELINE_ERROR);
     }
 }
@@ -616,7 +616,7 @@ static void include_directory(const char* dir, const char* rx, bool execute, cha
             LOG_CONFIG_FORMAT_LINE(LOG_LEVEL_ERROR, "'@@x_include': stat for '%s' failed: %s", dir, strerror(errno))
             exit(INVALID_CONFIGURELINE_ERROR);
         }
-        check_permissions(dir, &fs, linenumber, filename, linebuf);
+        check_permissions(dir, &fs, "@@x_include", linenumber, filename, linebuf);
     }
 
     n = scandir(dir, &namelist, dirfilter, alphasort);
@@ -661,7 +661,7 @@ static void include_directory(const char* dir, const char* rx, bool execute, cha
             } else {
                 int exec = execute && S_IXUSR&fs.st_mode;
                 if (exec) {
-                    check_permissions(filepath, &fs, linenumber, filename, linebuf);
+                    check_permissions(filepath, &fs, "@@x_include", linenumber, filename, linebuf);
                 }
                 log_msg(LOG_LEVEL_CONFIG,"%s: %s '%s'", dir, exec?"execute":"include", namelist[i]->d_name);
                 include_file(filepath, exec, include_depth, nested_rule_prefix);
